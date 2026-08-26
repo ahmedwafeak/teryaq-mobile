@@ -16,6 +16,15 @@ class AiVerificationResult {
 }
 
 class AiVerificationService {
+  /// Clean and normalize text
+  static String _normalize(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\u0621-\u064A\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   /// Calculate Levenshtein distance for fuzzy OCR matching
   static int _levenshteinDistance(String s1, String s2) {
     if (s1 == s2) return 0;
@@ -40,7 +49,7 @@ class AiVerificationService {
 
   /// Similarity score between 0.0 and 1.0
   static double _similarityScore(String s1, String s2) {
-    final dist = _levenshteinDistance(s1.toLowerCase(), s2.toLowerCase());
+    final dist = _levenshteinDistance(s1, s2);
     final maxLen = max(s1.length, s2.length);
     if (maxLen == 0) return 1.0;
     return 1.0 - (dist / maxLen);
@@ -52,10 +61,12 @@ class AiVerificationService {
     required String simulatedCapturedText,
     String? referenceImageUrl,
   }) async {
-    // Fast inference simulation (~300ms)
     await Future.delayed(const Duration(milliseconds: 300));
 
-    if (simulatedCapturedText.trim().isEmpty) {
+    final cleanTarget = _normalize(targetMedication);
+    final cleanCaptured = _normalize(simulatedCapturedText);
+
+    if (cleanCaptured.isEmpty) {
       return AiVerificationResult(
         isVerified: false,
         confidenceScore: 0.0,
@@ -64,27 +75,32 @@ class AiVerificationService {
       );
     }
 
-    final normalizedTarget = targetMedication.toLowerCase();
-    final normalizedCaptured = simulatedCapturedText.toLowerCase();
+    final targetTokens = cleanTarget.split(' ').where((t) => t.length >= 3).toList();
+    final capturedTokens = cleanCaptured.split(' ').where((t) => t.length >= 3).toList();
 
-    // Check exact substring match first
-    double highestSimilarity = 0.0;
-    final targetTokens = normalizedTarget.split(RegExp(r'\s+'));
-    final capturedTokens = normalizedCaptured.split(RegExp(r'\s+'));
+    if (targetTokens.isEmpty) {
+      targetTokens.addAll(cleanTarget.split(' '));
+    }
+
+    double totalMatchedScore = 0.0;
+    int matchedCount = 0;
 
     for (var targetToken in targetTokens) {
-      if (targetToken.length < 2) continue;
+      double maxTokenSim = 0.0;
       for (var capturedToken in capturedTokens) {
         final sim = _similarityScore(targetToken, capturedToken);
-        if (sim > highestSimilarity) {
-          highestSimilarity = sim;
-        }
+        if (sim > maxTokenSim) maxTokenSim = sim;
+      }
+      if (maxTokenSim >= 0.70) {
+        matchedCount++;
+        totalMatchedScore += maxTokenSim;
       }
     }
 
-    // High confidence threshold for verification
-    if (highestSimilarity >= 0.70 || normalizedCaptured.contains('bottle') || normalizedCaptured.contains('pack')) {
-      final score = min(0.98, max(0.85, highestSimilarity));
+    final overallSimilarity = targetTokens.isNotEmpty ? (totalMatchedScore / targetTokens.length) : 0.0;
+
+    if (overallSimilarity >= 0.65 && matchedCount > 0) {
+      final score = min(0.98, max(0.85, overallSimilarity));
       return AiVerificationResult(
         isVerified: true,
         confidenceScore: score,
@@ -94,7 +110,7 @@ class AiVerificationService {
     } else {
       return AiVerificationResult(
         isVerified: false,
-        confidenceScore: max(0.20, highestSimilarity),
+        confidenceScore: max(0.20, overallSimilarity),
         detectedText: simulatedCapturedText,
         message: 'عذراً، الصورة الملتقطة لا تطابق صورة علبة دواء $targetMedication! 🔴',
       );

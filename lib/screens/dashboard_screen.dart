@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/google_auth_service.dart';
 import 'alarm_ring_screen.dart';
 import 'barcode_scan_screen.dart';
+import 'invite_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -76,11 +78,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: const Color(0xFF1E293B),
         title: Text('أهلاً بك، $patientName'),
         centerTitle: true,
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _fetchUserMedications,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            tooltip: 'تسجيل الخروج',
+            onPressed: () async {
+              await GoogleAuthService.signOut();
+              if (context.mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InviteScreen()),
+                );
+              }
+            },
           ),
         ],
       ),

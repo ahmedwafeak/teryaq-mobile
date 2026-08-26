@@ -11,7 +11,13 @@ class ApiService {
   }
 
   /// Google Account Authentication
-  static Future<Map<String, dynamic>> googleAuth(String email, String displayName, String googleId) async {
+  static Future<Map<String, dynamic>> googleAuth(
+    String email,
+    String displayName,
+    String googleId, {
+    String? idToken,
+    String? photoUrl,
+  }) async {
     try {
       final response = await http
           .post(
@@ -21,6 +27,8 @@ class ApiService {
               'email': email,
               'displayName': displayName,
               'googleId': googleId,
+              'idToken': idToken,
+              'photoUrl': photoUrl,
             }),
           )
           .timeout(const Duration(seconds: 10));

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'dashboard_screen.dart';
 
+import '../services/google_auth_service.dart';
+
 class InviteScreen extends StatefulWidget {
   const InviteScreen({Key? key}) : super(key: key);
 
@@ -14,33 +16,53 @@ class _InviteScreenState extends State<InviteScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedSession();
+  }
+
+  void _checkSavedSession() async {
+    final savedUser = await GoogleAuthService.getSavedSession();
+    if (savedUser != null && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DashboardScreen(userData: savedUser),
+        ),
+      );
+    }
+  }
+
   void _handleGoogleLogin() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    final res = await ApiService.googleAuth(
-      'patient.test@gmail.com',
-      'الشيخ أحمد',
-      '10987654321',
-    );
+    final res = await GoogleAuthService.signInWithGoogle();
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (res['success'] == true) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DashboardScreen(userData: res['user']),
-        ),
-      );
-    } else {
+    if (mounted) {
       setState(() {
-        _errorMessage = res['message'] ?? 'فشل تسجيل الدخول باستخدام Google.';
+        _isLoading = false;
       });
+    }
+
+    if (res['success'] == true && res['user'] != null) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DashboardScreen(userData: res['user']),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _errorMessage = res['message'] ?? 'فشل تسجيل الدخول باستخدام Google.';
+        });
+      }
     }
   }
 
