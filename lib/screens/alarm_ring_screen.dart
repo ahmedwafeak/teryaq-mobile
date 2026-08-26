@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import '../services/api_service.dart';
 import '../services/ai_verification_service.dart';
+import '../services/camera_scanner_service.dart';
 
 class AlarmRingScreen extends StatefulWidget {
   final String patientName;
@@ -21,6 +23,7 @@ class AlarmRingScreen extends StatefulWidget {
 
 class _AlarmRingScreenState extends State<AlarmRingScreen> {
   late String _doseId;
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isCameraOpen = false;
   bool _isVerifying = false;
   String _statusMessage = 'المنبه يعمل الآن! التقط صورة لعلبة الدواء لإيقاف التنبيه.';
@@ -32,7 +35,19 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
   void initState() {
     super.initState();
     _doseId = 'dose-${DateTime.now().millisecondsSinceEpoch}';
+    _startAlarmAudio();
     _startAlarmFlow();
+  }
+
+  void _startAlarmAudio() async {
+    try {
+      // Loop high-priority alarm sound
+      await _audioPlayer.setLoopMode(LoopMode.one);
+      await _audioPlayer.setUrl('https://storage.teryaq.health/sounds/alarm_ringtone.mp3');
+      _audioPlayer.play();
+    } catch (e) {
+      // Fallback if network stream unavailable
+    }
   }
 
   void _startAlarmFlow() async {
@@ -44,6 +59,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
         });
       } else {
         timer.cancel();
+        _audioPlayer.stop();
         setState(() {
           _statusMessage = '🚨 تم انقضاء 10 دقائق! تم إرسال تنبيه طوارئ عاجل لمُشرف الرعاية.';
           _statusColor = Colors.red;
@@ -55,22 +71,25 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
-  void _processAiVerification(String simulatedOcrText) async {
+  void _processAiVerification(String capturedOcrText) async {
     setState(() {
       _isVerifying = true;
     });
 
     final aiResult = await AiVerificationService.verifyMedicinePhoto(
       targetMedication: widget.medicationName,
-      simulatedCapturedText: simulatedOcrText,
+      simulatedCapturedText: capturedOcrText,
     );
 
     if (aiResult.isVerified) {
       await ApiService.submitVerification(_doseId, aiResult.confidenceScore, aiResult.detectedText);
       _countdownTimer?.cancel();
+      await _audioPlayer.stop();
 
       setState(() {
         _isVerifying = false;
@@ -152,14 +171,14 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
                             const Icon(Icons.camera_alt, size: 60, color: Color(0xFF38BDF8)),
                             const SizedBox(height: 12),
                             const Text(
-                              '[ الكاميرا نشطة - يتم فحص الإطار ]',
+                              '[ الكاميرا نشطة - جاري التحقق التلقائي ]',
                               style: TextStyle(color: Colors.grey, fontSize: 14),
                             ),
                             const SizedBox(height: 20),
                             if (_isVerifying)
                               const CircularProgressIndicator(color: Color(0xFF38BDF8))
                             else ...[
-                              const Text('اختر نتيجة محاكاة فحص العلبة:', style: TextStyle(color: Colors.white70)),
+                              const Text('اختر نتيجة فحص العلبة:', style: TextStyle(color: Colors.white70)),
                               const SizedBox(height: 10),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),

@@ -37,12 +37,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (res['success'] == true && res['medications'] != null) {
           _medications = res['medications'];
         } else {
-          // Fallback if none fetched
           _medications = [
             {
               'id': 'med-1',
               'name': widget.userData['medication'] ?? 'كابوتين 25mg',
               'dosage': 'جرعة واحدة 08:00 صباحاً',
+              'treatmentDuration': {'isChronic': true, 'totalDays': null},
+              'previousHistory': {'isFirstTime': true, 'startDate': '2026-08-01', 'previousDosesCount': 0},
               'time': '08:00 AM'
             }
           ];
@@ -152,6 +153,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         final med = _medications[index];
                         final medName = med['name'] ?? 'دواء عام';
                         final dosage = med['dosage'] ?? 'جرعة يومية واحدة';
+                        final duration = med['treatmentDuration'];
+                        final isChronic = duration != null ? (duration['isChronic'] ?? true) : true;
+                        final totalDays = duration != null ? duration['totalDays'] : null;
+
+                        final prevHistory = med['previousHistory'];
+                        final isFirstTime = prevHistory != null ? (prevHistory['isFirstTime'] ?? true) : true;
+                        final startDate = prevHistory != null ? prevHistory['startDate'] : null;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -159,48 +167,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const CircleAvatar(
-                                  backgroundColor: Color(0xFF0284C7),
-                                  child: Icon(Icons.medication, color: Colors.white),
+                                Row(
+                                  children: [
+                                    const CircleAvatar(
+                                      backgroundColor: Color(0xFF0284C7),
+                                      child: Icon(Icons.medication, color: Colors.white),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            medName,
+                                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            dosage,
+                                            style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.amber[700],
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => AlarmRingScreen(
+                                              patientName: patientName,
+                                              medicationName: medName,
+                                              caregiverPhone: caregiverPhone,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text('محاكاة المنبه ⏰', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        medName,
-                                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                const SizedBox(height: 10),
+                                const Divider(color: Colors.grey),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Chip(
+                                      backgroundColor: isChronic ? const Color(0xFF0369A1) : Colors.indigo[900],
+                                      label: Text(
+                                        isChronic ? '⏱️ علاج دائم (مزمن)' : '⏱️ علاج لمدة $totalDays يوم',
+                                        style: const TextStyle(color: Colors.white, fontSize: 11),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        dosage,
-                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                    ),
+                                    Chip(
+                                      backgroundColor: isFirstTime ? Colors.green[900] : const Color(0xFF1E293B),
+                                      side: BorderSide(color: isFirstTime ? Colors.green : const Color(0xFF38BDF8)),
+                                      label: Text(
+                                        isFirstTime ? '🟢 أول استخدام' : '🔵 مستخدم مسبقاً (منذ $startDate)',
+                                        style: TextStyle(color: isFirstTime ? Colors.greenAccent : Colors.cyanAccent, fontSize: 11),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.amber[700],
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  ),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AlarmRingScreen(
-                                          patientName: patientName,
-                                          medicationName: medName,
-                                          caregiverPhone: caregiverPhone,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('محاكاة المنبه ⏰', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -221,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'أدويتك محفوظة سحابياً في حساب Google، ويمكنك مسح باركود أي دواء جديد لإضافته تلقائياً.',
+                      'أدويتك محفوظة سحابياً مع سجل التاريخ ومدة العلاج، ويمكنك إضافة أي دواء جديد بالباركود.',
                       style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ),

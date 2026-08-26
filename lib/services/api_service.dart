@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Live Vercel Production API Gateway
   static String baseUrl = 'https://teryaq-backend-six.vercel.app/api';
 
   static void setBaseUrl(String newUrl) {
@@ -55,13 +54,16 @@ class ApiService {
     }
   }
 
-  /// Add New Medication via Barcode to Account
+  /// Add New Medication with Duration & History
   static Future<Map<String, dynamic>> addMedication({
     required String userId,
     required String barcode,
     required String name,
     required String dosage,
     required String time,
+    Map<String, dynamic>? treatmentDuration,
+    List<String>? dailySchedule,
+    Map<String, dynamic>? previousHistory,
   }) async {
     try {
       final response = await http
@@ -74,6 +76,13 @@ class ApiService {
               'name': name,
               'dosage': dosage,
               'time': time,
+              'treatmentDuration': treatmentDuration ?? {'isChronic': true, 'totalDays': null},
+              'dailySchedule': dailySchedule ?? [time],
+              'previousHistory': previousHistory ?? {
+                'isFirstTime': true,
+                'startDate': DateTime.now().toString().split(' ')[0],
+                'previousDosesCount': 0
+              },
             }),
           )
           .timeout(const Duration(seconds: 10));
